@@ -7,6 +7,7 @@ const socket = require("socket.io");
 const io = socket(server);
 const path = require("path");
 const rooms = {};
+const socketToRoom = {};
 io.on("connection", (socket) => {
   socket.on("join room", (roomID) => {
     if (rooms[roomID]) {
@@ -14,10 +15,12 @@ io.on("connection", (socket) => {
     } else {
       rooms[roomID] = [socket.id];
     }
-    const otherUser = rooms[roomID].find((id) => id !== socket.id);
-    if (otherUser) {
-      socket.emit("other user", otherUser);
-      socket.to(otherUser).emit("user joined", socket.id);
+    socketToRoom[socket.id] = roomID;
+    const otherUsers = rooms[roomID].filter((id) => id !== socket.id);
+    console.log(otherUsers);
+    if (otherUsers) {
+      socket.emit("other user", otherUsers);
+      socket.to(otherUsers).emit("user joined", socket.id);
     }
   });
   socket.on("offer", (payload) => {
@@ -29,7 +32,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("ice-candidate", (incoming) => {
-    io.to(incoming.target).emit("ice-candidate", incoming.candidate);
+    io.to(incoming.target).emit("ice-candidate", incoming);
   });
 });
 if (process.env.PROD) {
