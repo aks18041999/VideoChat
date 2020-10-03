@@ -12,7 +12,11 @@ const CreateRoom = (props) => {
   }
   return (
     <div>
-      <button onClick={create}>Create Room</button>
+    <h1>VIDEO CHAT APPLICATION(BETA MODE)</h1>
+      <div>  
+        <button onClick={create}>Create Room</button>
+      </div>
+    <div>
       <input
         type="text"
         placeholder="room id"
@@ -20,7 +24,8 @@ const CreateRoom = (props) => {
         onChange={(e) => setRoomID(e.target.value)}
       />
       <button onClick={joinRoom}>Join Room</button>
-    </div>
+    </div>    
+</div>
   );
 };
 
