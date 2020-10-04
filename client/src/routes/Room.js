@@ -74,11 +74,19 @@ const Room = (props) => {
   function createPeer(userID) {
     const peer = new RTCPeerConnection({
       iceServers: [
-        { url: "stun:stun.l.google.com:19302" },
+        { urls: ["stun:ss-turn1.xirsys.com"] },
         {
-          url: "turn:192.158.29.39:3478?transport=tcp",
-          credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=",
-          username: "28224511:1379330808",
+          username:
+            "N8NQ9gRUMu2Ct4g5ZrNa8xG1kfsWURT04hMxht3BzMpO4yJvTHzO_wUhnE5kd3hRAAAAAF96H9pheXVzaDE4OTk=",
+          credential: "48df722e-0676-11eb-b4fb-0242ac140004",
+          urls: [
+            "turn:ss-turn1.xirsys.com:80?transport=udp",
+            "turn:ss-turn1.xirsys.com:3478?transport=udp",
+            "turn:ss-turn1.xirsys.com:80?transport=tcp",
+            "turn:ss-turn1.xirsys.com:3478?transport=tcp",
+            "turns:ss-turn1.xirsys.com:443?transport=tcp",
+            "turns:ss-turn1.xirsys.com:5349?transport=tcp",
+          ],
         },
       ],
     });
