@@ -10,7 +10,7 @@ const Videos = (props) => {
   return (
     <div>
       {props.streams.map((stream) => (
-        <video ref={(ref) => setSrcObject(ref, stream)} autoPlay />
+        <video inline ref={(ref) => setSrcObject(ref, stream)} autoPlay />
       ))}
     </div>
   );
@@ -25,6 +25,7 @@ const Room = (props) => {
   const userStream = useRef();
   const [peers, setPeers] = useState([]);
   const peersRef = useRef({});
+  const videoShow = useRef({});
   const roomID = props.match.params.roomID;
 
   useEffect(() => {
@@ -46,6 +47,7 @@ const Room = (props) => {
             peers.push(peer);
           });
           setPeers(peers);
+          console.log(peers);
         });
 
         socketRef.current.on("user joined", (userID) => {
@@ -63,11 +65,10 @@ const Room = (props) => {
   function callUser(userID) {
     const peer = createPeer(userID);
     peersRef.current[userID] = peer;
-    userStream.current
-      .getTracks()
-      .forEach((track) =>
-        peersRef.current[userID].addTrack(track, userStream.current)
-      );
+    userStream.current.getTracks().forEach((track) => {
+      console.log(track);
+      peersRef.current[userID].addTrack(track, userStream.current);
+    });
     return peer;
   }
 
@@ -99,6 +100,7 @@ const Room = (props) => {
   }
 
   function handleNegotiationNeededEvent(userID) {
+    console.log("HANDLING NEGOTIATION EVENT WITH " + userID);
     peersRef.current[userID]
       .createOffer()
       .then((offer) => {
@@ -117,6 +119,7 @@ const Room = (props) => {
   }
 
   function handleRecieveCall(incoming) {
+    console.log("HANDLING RECIEVE CALL FROM " + incoming.caller);
     const callerID = incoming.caller;
     peersRef.current[callerID] = createPeer(callerID);
     console.log(callerID);
@@ -157,6 +160,7 @@ const Room = (props) => {
   }
 
   function handleICECandidateEvent(e, userID) {
+    console.log("ICE CANDIDATE +" + e);
     if (e.candidate) {
       const payload = {
         caller: socketRef.current.id,
@@ -176,16 +180,20 @@ const Room = (props) => {
   }
 
   function handleTrackEvent(e, userID) {
-    //console.log(e.streams[0]);
+    console.log(e);
+    console.log(e.streams[0].getTracks());
     console.log(userID);
-    let remoteStream = e.streams[0];
-    setPeersVideo((remoteStreams) => [...remoteStreams, remoteStream]);
+    if (videoShow.current[userID] == null) {
+      let remoteStream = e.streams[0];
+      setPeersVideo((remoteStreams) => [...remoteStreams, remoteStream]);
+      videoShow.current[userID] = userID;
+    }
   }
 
   return (
     <div>
       <h1>{props.match.params.roomID}</h1>
-      <video autoPlay ref={userVideo} />
+      <video className="selfVideo" autoPlay ref={userVideo} />
       <Videos streams={peersVideo}></Videos>
     </div>
   );
