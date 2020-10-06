@@ -1,21 +1,61 @@
 import React, { useRef, useEffect, useState } from "react";
 import io from "socket.io-client";
+import { makeStyles } from "@material-ui/core/styles";
+import Paper from "@material-ui/core/Paper";
+import Grid from "@material-ui/core/Grid";
+
+const useStyles = makeStyles((theme) => ({
+  root: {
+    flexGrow: 1,
+    backgroundColor: "#424242",
+  },
+  paper: {
+    padding: theme.spacing(2),
+    textAlign: "center",
+    color: theme.palette.text.secondary,
+  },
+  video: {
+    height: "100%",
+    width: "100%",
+  },
+}));
 
 const Videos = (props) => {
+  const classes = useStyles();
   function setSrcObject(ref, stream) {
     if (ref) {
       ref.srcObject = stream;
     }
   }
   return (
-    <div>
+    <Grid container spacing={3}>
+      <Grid item xs={3}>
+        <Paper className={classes.paper}>
+          <video
+            className={classes.video}
+            autoPlay
+            ref={props.userVideo}
+            muted
+          />
+        </Paper>
+      </Grid>
       {props.streams.map((stream) => (
-        <video inline ref={(ref) => setSrcObject(ref, stream)} autoPlay />
+        <Grid item xs={3}>
+          <Paper className={classes.paper}>
+            <video
+              className={classes.video}
+              inline
+              ref={(ref) => setSrcObject(ref, stream)}
+              autoPlay
+            />
+          </Paper>
+        </Grid>
       ))}
-    </div>
+    </Grid>
   );
 };
 const Room = (props) => {
+  const classes = useStyles();
   const userVideo = useRef();
   const [peersVideo, setPeersVideo] = useState([]);
   const socketRef = useRef();
@@ -25,7 +65,6 @@ const Room = (props) => {
   const dataChannel = useRef({});
   const videoShow = useRef({});
   const roomID = props.match.params.roomID;
-  const [msg, setMsg] = useState("");
   const youtubePlayer = useRef({});
   const [videoID, setVideoID] = useState("");
   const videoState = useRef({});
@@ -264,11 +303,13 @@ const Room = (props) => {
     youtubePlayer.current.loadVideoById(videoID.split("=")[1]);
   }
   return (
-    <div>
-      <h1>{props.match.params.roomID}</h1>
-      <div id="player"></div>
-      <video className="selfVideo" autoPlay ref={userVideo} muted />
-      <Videos streams={peersVideo}></Videos>
+    <div className={classes.root}>
+      <h1 style={{ color: "#ffffff" }}>
+        Room ID is {props.match.params.roomID}
+      </h1>
+      <Grid item xs={12}>
+        <div style={{ alignContent: "center" }} id="player"></div>
+      </Grid>
       <input
         type="text"
         placeholder="video link"
@@ -276,6 +317,7 @@ const Room = (props) => {
         onChange={(e) => setVideoID(e.target.value)}
       />
       <button onClick={loadVideo}>Load video</button>
+      <Videos streams={peersVideo} userVideo={userVideo}></Videos>
     </div>
   );
 };
