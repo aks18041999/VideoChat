@@ -18,16 +18,17 @@ const Videos = (props) => {
 const Room = (props) => {
   const userVideo = useRef();
   const [peersVideo, setPeersVideo] = useState([]);
-  //const peerRef = useRef();
-  const partnerVideo = useRef();
   const socketRef = useRef();
-  const otherUser = useRef();
   const userStream = useRef();
   const [peers, setPeers] = useState([]);
   const peersRef = useRef({});
+  const dataChannel = useRef({});
   const videoShow = useRef({});
   const roomID = props.match.params.roomID;
-
+  const [msg, setMsg] = useState("");
+  const youtubePlayer = useRef({});
+  const [videoID, setVideoID] = useState("");
+  const videoState = useRef({});
   useEffect(() => {
     navigator.mediaDevices
       .getUserMedia({ audio: true, video: true })
@@ -50,9 +51,7 @@ const Room = (props) => {
           console.log(peers);
         });
 
-        socketRef.current.on("user joined", (userID) => {
-          otherUser.current = userID;
-        });
+        socketRef.current.on("user joined", (userID) => {});
 
         socketRef.current.on("offer", handleRecieveCall);
 
@@ -61,10 +60,18 @@ const Room = (props) => {
         socketRef.current.on("ice-candidate", handleNewICECandidateMsg);
       });
   }, []);
+  useEffect(() => {
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName("script")[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    window.onYouTubeIframeAPIReady = loadVideoPlayer;
+  }, []);
 
   function callUser(userID) {
     const peer = createPeer(userID);
     peersRef.current[userID] = peer;
+    dataChannel.current[userID] = createChannel(userID);
     userStream.current.getTracks().forEach((track) => {
       console.log(track);
       peersRef.current[userID].addTrack(track, userStream.current);
@@ -95,10 +102,20 @@ const Room = (props) => {
     peer.onicecandidate = (e) => handleICECandidateEvent(e, userID);
     peer.ontrack = (e) => handleTrackEvent(e, userID);
     peer.onnegotiationneeded = () => handleNegotiationNeededEvent(userID);
-
+    peer.ondatachannel = (e) => {
+      console.log(e.channel);
+      dataChannel.current[userID] = e.channel;
+      console.log(dataChannel.current[userID]);
+      dataChannel.current[userID].onmessage = (e) => handleMessage(e, userID);
+    };
     return peer;
   }
-
+  function createChannel(userID) {
+    const channel = peersRef.current[userID].createDataChannel("Data Chn");
+    console.log(channel);
+    channel.onmessage = (e) => handleMessage(e, userID);
+    return channel;
+  }
   function handleNegotiationNeededEvent(userID) {
     console.log("HANDLING NEGOTIATION EVENT WITH " + userID);
     peersRef.current[userID]
@@ -189,12 +206,76 @@ const Room = (props) => {
       videoShow.current[userID] = userID;
     }
   }
+  function sendMessage(value, key, map) {
+    console.log(videoState.current);
+    if (videoState.current == "play") {
+      value.send(JSON.stringify({ type: "play" }));
+    } else if (videoState.current == "pause") {
+      value.send(JSON.stringify({ type: "pause" }));
+    } else {
+      value.send(JSON.stringify({ type: "newVideo", data: videoID }));
+    }
+  }
+  function handleMessage(e, userID) {
+    const msg = JSON.parse(e.data);
+    console.log("Control changed from " + userID);
+    console.log(msg);
+    if (msg.type === "newVideo") {
+      youtubePlayer.current.loadVideoById(msg.data.split("=")[1]);
+    } else if (msg.type === "pause") {
+      youtubePlayer.current.pauseVideo();
+    } else if (msg.type === "play") {
+      youtubePlayer.current.playVideo();
+    }
+  }
+  function sendMsg(task) {
+    console.log(dataChannel.current);
+    Object.values(dataChannel.current).forEach(sendMessage);
+  }
 
+  ////////////////////////
+  function loadVideoPlayer() {
+    const player = new window.YT.Player("player", {
+      height: "390",
+      width: "640",
+      events: {
+        onReady: onPlayerReady,
+        onStateChange: onPlayerStateChange,
+      },
+    });
+    youtubePlayer.current = player;
+  }
+  function onPlayerReady() {
+    //NOTHING TO DO FOR NOW;
+  }
+  function onPlayerStateChange(event) {
+    const val = event.data;
+    if (val == 1) {
+      videoState.current = "play";
+      sendMsg("play");
+    } else if (val == 2) {
+      videoState.current = "pause";
+      sendMsg("pause");
+    }
+  }
+  function loadVideo() {
+    videoState.current = "newVideo";
+    sendMsg("newVideo");
+    youtubePlayer.current.loadVideoById(videoID.split("=")[1]);
+  }
   return (
     <div>
       <h1>{props.match.params.roomID}</h1>
-      <video className="selfVideo" autoPlay ref={userVideo} />
+      <div id="player"></div>
+      <video className="selfVideo" autoPlay ref={userVideo} muted />
       <Videos streams={peersVideo}></Videos>
+      <input
+        type="text"
+        placeholder="video link"
+        value={videoID}
+        onChange={(e) => setVideoID(e.target.value)}
+      />
+      <button onClick={loadVideo}>Load video</button>
     </div>
   );
 };
