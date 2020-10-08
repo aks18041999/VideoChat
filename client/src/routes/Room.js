@@ -48,6 +48,7 @@ const Videos = (props) => {
               ref={(ref) => setSrcObject(ref, stream)}
               autoPlay
             />
+            <h1>THIS IS A BIG BLOCK</h1>
           </Paper>
         </Grid>
       ))}
@@ -56,15 +57,18 @@ const Videos = (props) => {
 };
 const Room = (props) => {
   const classes = useStyles();
+
   const userVideo = useRef();
-  const [peersVideo, setPeersVideo] = useState([]);
   const socketRef = useRef();
   const userStream = useRef();
-  const [peers, setPeers] = useState([]);
-  const peersRef = useRef({});
+
+  const [peersVideo, setPeersVideo] = useState([]);
+  const [peersRef, setPeersRef] = useState({});
   const dataChannel = useRef({});
-  const videoShow = useRef({});
+  const [videoShow, setVideoShow] = useState({});
+
   const roomID = props.match.params.roomID;
+
   const youtubePlayer = useRef({});
   const [videoID, setVideoID] = useState("");
   const videoState = useRef({});
@@ -81,13 +85,9 @@ const Room = (props) => {
         socketRef.current.emit("join room", props.match.params.roomID);
 
         socketRef.current.on("other user", (users) => {
-          const peers = [];
           users.forEach((userID) => {
             const peer = callUser(userID);
-            peers.push(peer);
           });
-          setPeers(peers);
-          console.log(peers);
         });
 
         socketRef.current.on("user joined", (userID) => {});
@@ -97,6 +97,9 @@ const Room = (props) => {
         socketRef.current.on("answer", handleAnswer);
 
         socketRef.current.on("ice-candidate", handleNewICECandidateMsg);
+      })
+      .catch((e) => {
+        console.log(e);
       });
   }, []);
   useEffect(() => {
@@ -109,11 +112,15 @@ const Room = (props) => {
 
   function callUser(userID) {
     const peer = createPeer(userID);
-    peersRef.current[userID] = peer;
+    const temp = peersRef;
+    temp[userID] = peer;
+    setPeersRef(temp);
+    //setPeersRef((peersRef) => ({ ...peersRef, [userID]: peer }));
+    console.log(peersRef);
     dataChannel.current[userID] = createChannel(userID);
     userStream.current.getTracks().forEach((track) => {
       console.log(track);
-      peersRef.current[userID].addTrack(track, userStream.current);
+      peersRef[userID].addTrack(track, userStream.current);
     });
     return peer;
   }
@@ -147,26 +154,28 @@ const Room = (props) => {
       console.log(dataChannel.current[userID]);
       dataChannel.current[userID].onmessage = (e) => handleMessage(e, userID);
     };
+    peer.onconnectionstatechange = (e) =>
+      handleConnectionStateChange(e, userID);
     return peer;
   }
   function createChannel(userID) {
-    const channel = peersRef.current[userID].createDataChannel("Data Chn");
+    const channel = peersRef[userID].createDataChannel("Data Chn");
     console.log(channel);
     channel.onmessage = (e) => handleMessage(e, userID);
     return channel;
   }
   function handleNegotiationNeededEvent(userID) {
     console.log("HANDLING NEGOTIATION EVENT WITH " + userID);
-    peersRef.current[userID]
+    peersRef[userID]
       .createOffer()
       .then((offer) => {
-        return peersRef.current[userID].setLocalDescription(offer);
+        return peersRef[userID].setLocalDescription(offer);
       })
       .then(() => {
         const payload = {
           target: userID,
           caller: socketRef.current.id,
-          sdp: peersRef.current[userID].localDescription,
+          sdp: peersRef[userID].localDescription,
         };
         console.log(payload);
         socketRef.current.emit("offer", payload);
@@ -177,40 +186,41 @@ const Room = (props) => {
   function handleRecieveCall(incoming) {
     console.log("HANDLING RECIEVE CALL FROM " + incoming.caller);
     const callerID = incoming.caller;
-    peersRef.current[callerID] = createPeer(callerID);
+    const temp = peersRef;
+    temp[callerID] = createPeer(callerID);
+    setPeersRef(temp);
     console.log(callerID);
-    console.log(peersRef.current[callerID]);
+    console.log(peersRef[callerID]);
     const desc = new RTCSessionDescription(incoming.sdp);
     console.log(desc);
-    peersRef.current[callerID]
+    peersRef[callerID]
       .setRemoteDescription(desc)
       .then(() => {
         userStream.current
           .getTracks()
           .forEach((track) =>
-            peersRef.current[callerID].addTrack(track, userStream.current)
+            peersRef[callerID].addTrack(track, userStream.current)
           );
       })
       .then(() => {
-        return peersRef.current[callerID].createAnswer();
+        return peersRef[callerID].createAnswer();
       })
       .then((answer) => {
-        return peersRef.current[callerID].setLocalDescription(answer);
+        return peersRef[callerID].setLocalDescription(answer);
       })
       .then(() => {
         const payload = {
           target: incoming.caller,
           caller: socketRef.current.id,
-          sdp: peersRef.current[callerID].localDescription,
+          sdp: peersRef[callerID].localDescription,
         };
         socketRef.current.emit("answer", payload);
       });
-    setPeers((peers) => [...peers, peersRef.current[callerID]]);
   }
 
   function handleAnswer(message) {
     const desc = new RTCSessionDescription(message.sdp);
-    peersRef.current[message.caller]
+    peersRef[message.caller]
       .setRemoteDescription(desc)
       .catch((e) => console.log(e));
   }
@@ -230,7 +240,7 @@ const Room = (props) => {
   function handleNewICECandidateMsg(incoming) {
     const candidate = new RTCIceCandidate(incoming.candidate);
 
-    peersRef.current[incoming.caller]
+    peersRef[incoming.caller]
       .addIceCandidate(candidate)
       .catch((e) => console.log(e));
   }
@@ -239,12 +249,51 @@ const Room = (props) => {
     console.log(e);
     console.log(e.streams[0].getTracks());
     console.log(userID);
-    if (videoShow.current[userID] == null) {
+    if (videoShow[userID] == null) {
       let remoteStream = e.streams[0];
       setPeersVideo((remoteStreams) => [...remoteStreams, remoteStream]);
-      videoShow.current[userID] = userID;
+      const tempVideoShow = videoShow;
+      tempVideoShow[userID] = e.streams[0];
+      setVideoShow(tempVideoShow);
+      console.log(videoShow);
     }
   }
+
+  function handleConnectionStateChange(e, userID) {
+    console.log(e);
+    console.log(userID);
+    const currState = e.currentTarget.iceConnectionState;
+    if (currState == "disconnected") {
+      //Remove from Socket Room
+      socketRef.current.emit(
+        "remove user",
+        JSON.stringify({ roomID: roomID, userID: userID })
+      );
+      //Remove from PeersRef
+
+      console.log("WE ARE HERE");
+      const tempPeersRef = peersRef;
+      delete tempPeersRef[userID];
+      setPeersRef(tempPeersRef);
+      //Remove from DataChannelRef
+      delete dataChannel.current[userID];
+      //Remove from Video Show
+      const tempVideoShow = videoShow;
+      delete tempVideoShow[userID];
+      setVideoShow(tempVideoShow);
+      const temp = [];
+      Object.entries(videoShow).forEach(([key, stream]) => {
+        console.log(`${key}: ${stream}`);
+        temp.push(stream);
+      });
+      setPeersVideo(temp);
+      console.log(peersRef);
+      console.log(videoShow);
+      console.log(dataChannel.current);
+      console.log("DONE HERE");
+    }
+  }
+
   function sendMessage(value, key, map) {
     console.log(videoState.current);
     if (videoState.current == "play") {
@@ -277,6 +326,7 @@ const Room = (props) => {
     const player = new window.YT.Player("player", {
       height: "390",
       width: "640",
+      playerVars: { autoplay: 0 },
       events: {
         onReady: onPlayerReady,
         onStateChange: onPlayerStateChange,
@@ -284,9 +334,7 @@ const Room = (props) => {
     });
     youtubePlayer.current = player;
   }
-  function onPlayerReady() {
-    //NOTHING TO DO FOR NOW;
-  }
+  function onPlayerReady(e) {}
   function onPlayerStateChange(event) {
     const val = event.data;
     if (val == 1) {

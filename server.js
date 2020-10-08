@@ -34,6 +34,15 @@ io.on("connection", (socket) => {
   socket.on("ice-candidate", (incoming) => {
     io.to(incoming.target).emit("ice-candidate", incoming);
   });
+
+  socket.on("remove user", (info) => {
+    const data = JSON.parse(info);
+    console.log(data);
+    delete socketToRoom[data.userID];
+    const otherUsers = rooms[data.roomID].filter((id) => id !== data.userID);
+    rooms[data.roomID] = otherUsers;
+    io.to(otherUsers).emit("user left", data.userID);
+  });
 });
 if (process.env.PROD) {
   app.use(express.static(path.join(__dirname, "./client/build")));
